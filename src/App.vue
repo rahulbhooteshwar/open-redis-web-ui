@@ -89,6 +89,33 @@ export default {
     this.bindSideBarDrag();
     // addon init setup
     addon.setup();
+
+    // Suppress the native browser context menu everywhere.
+    // Custom right-click menus (Tabs, KeyListVirtualTree, RightClickMenu)
+    // still work because they handle contextmenu on their own elements
+    // before it reaches this global listener.
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // On page refresh or tab close, tell the server to close all Redis
+    // connections so they don't accumulate as zombies.
+    // sendBeacon is fire-and-forget but guaranteed to complete even during unload.
+    window.addEventListener('beforeunload', () => {
+      const url = (process.env.NODE_ENV === 'development' ? 'http://localhost:9988' : '') + '/api/redis/disconnect-all';
+      navigator.sendBeacon(url, '{}');
+    });
+
+    // Poll /api/health — redirect to offline page if server becomes unreachable
+    this._healthTimer = setInterval(async () => {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        if (!res.ok) throw new Error('not ok');
+      } catch {
+        window.location.href = '/offline.html';
+      }
+    }, 5000);
+  },
+  beforeDestroy() {
+    clearInterval(this._healthTimer);
   },
 };
 </script>
@@ -182,6 +209,10 @@ li .list-index {
   width: 100% !important;
   border-right: 1px solid #e4e0e0;
   overflow: hidden;
+  background-color: #f0f2f5;
+}
+.dark-mode .aside-connection {
+  background-color: #141e23;
 }
 /*fix right container imdraggable*/
 .right-main-container {

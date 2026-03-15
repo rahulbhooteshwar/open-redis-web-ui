@@ -6,6 +6,7 @@
       :config="config"
       :client="client"
       :keyList="keyList"
+      :loading="loading"
       @exportBatch="exportBatch">
     </component>
 
@@ -54,6 +55,7 @@ export default {
       onePageKeysCount: 0,
       loadAllTooltip: true,
       loadingAll: false,
+      loading: false,
     };
   },
   props: ['client', 'config', 'globalSettings'],
@@ -82,7 +84,7 @@ export default {
       return this.globalSettings.showLoadAllKeys;
     },
     searching() {
-      return this.$parent.$parent.$parent.$refs.operateItem.searchIcon == 'el-icon-loading';
+      return this.loading;
     },
   },
   created() {
@@ -221,16 +223,21 @@ export default {
       this.loadingAll = false;
     },
     setSearchStatus() {
+      this.loading = true;
       // search loading
-      this.$parent.$parent.$parent.$refs.operateItem.searchIcon = 'el-icon-loading';
-      // show cancel scanning btn after scanning for a while
-      this.$parent.$parent.$parent.$refs.operateItem.toggleCancelIcon(true);
+      const op = this.$parent.$parent.$parent.$refs.operateItem;
+      if (op) {
+        op.searchIcon = 'el-icon-loading';
+        op.toggleCancelIcon(true);
+      }
     },
     resetSearchStatus() {
-      // search input icon recover
-      this.$parent.$parent.$parent.$refs.operateItem.searchIcon = 'el-icon-search';
-      // remove cancel scanning btn
-      this.$parent.$parent.$parent.$refs.operateItem.toggleCancelIcon(false);
+      this.loading = false;
+      const op = this.$parent.$parent.$parent.$refs.operateItem;
+      if (op) {
+        op.searchIcon = 'el-icon-search';
+        op.toggleCancelIcon(false);
+      }
       // reset loading all status
       this.loadingAll = false;
     },

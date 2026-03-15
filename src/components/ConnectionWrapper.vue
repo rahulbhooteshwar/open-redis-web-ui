@@ -35,7 +35,7 @@
 </template>
 
 <script type="text/javascript">
-import redisClient from '@/redisClient.js';
+import { connectViaServer } from '@/utils/redisClientProxy.js';
 import KeyList from '@/components/KeyList';
 import OperateItem from '@/components/OperateItem';
 import ConnectionMenu from '@/components/ConnectionMenu';
@@ -115,15 +115,28 @@ export default {
           this.$bus.$emit('openStatus', client, this.config.connectionName);
           this.startPingInterval();
 
-          this.initShow();
-          callback && callback();
+          // nextTick: wait for Vue to flush the client prop down to child
+          // components (KeyList, OperateItem) before calling initShow,
+          // otherwise this.client is still null in the child when initShow
+          // tries to start scanning.
+          this.$nextTick(() => {
+            this.initShow();
+            callback && callback();
+          });
         });
       }
 
       // connection is ready
       else {
-        this.initShow();
-        callback && callback();
+        if (!client.readyInited) {
+          client.readyInited = true;
+          this.$bus.$emit('openStatus', client, this.config.connectionName);
+          this.startPingInterval();
+        }
+        this.$nextTick(() => {
+          this.initShow();
+          callback && callback();
+        });
       }
     },
     closeConnection(connectionName) {
@@ -160,18 +173,7 @@ export default {
       // select db
       configCopy.db = this.lastSelectedDb;
 
-      // ssh client
-      if (configCopy.sshOptions) {
-        var clientPromise = redisClient.createSSHConnection(
-          configCopy.sshOptions, configCopy.host, configCopy.port, configCopy.auth, configCopy,
-        );
-      }
-      // normal client
-      else {
-        var clientPromise = redisClient.createConnection(
-          configCopy.host, configCopy.port, configCopy.auth, configCopy,
-        );
-      }
+      const clientPromise = connectViaServer(configCopy);
 
       clientPromise.then((client) => {
         this.client = client;

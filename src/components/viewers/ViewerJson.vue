@@ -5,7 +5,8 @@
 <script type="text/javascript">
 import JsonEditor from '@/components/JsonEditor';
 
-const JSONbig = require('@qii404/json-bigint')({ useNativeBigInt: false });
+import JSONbigFactory from '@qii404/json-bigint';
+const JSONbig = JSONbigFactory({ useNativeBigInt: false });
 
 export default {
   props: ['content', 'disabled'],

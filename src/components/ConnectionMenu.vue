@@ -1,6 +1,6 @@
 <template>
 <div class="connection-menu-title">
-  <div class="connection-opt-icons">
+  <div class="connection-opt-icons" @click.stop>
     <!-- right menu operate icons -->
     <i :title="$t('message.redis_status')"
       class="connection-right-icon fa fa-home"
@@ -72,8 +72,8 @@
       </el-dropdown-menu>
     </el-dropdown>
   </div>
-  <div :title="connectionTitle()" class="connection-name">{{config.connectionName}}
-    <!-- <i v-if="client" style="position: absolute; left: 2px; bottom: 5px; width: 8px; height: 8px; border-radius: 4px; background-color: green;"></i> -->
+  <div :title="connectionTitle()" class="connection-name">
+    <span :class="['conn-status-dot', client ? 'conn-status-dot--live' : 'conn-status-dot--offline']"></span>{{config.connectionName}}
   </div>
 
   <!-- edit connection dialog -->
@@ -88,7 +88,6 @@
 
 <script type="text/javascript">
 import storage from '@/storage.js';
-import { remote } from 'electron';
 import NewConnectionDialog from '@/components/NewConnectionDialog';
 import splitargs from '@qii404/redis-splitargs';
 
@@ -180,26 +179,27 @@ export default {
         connectionName: undefined,
       };
 
-      storage.addConnection(newConfig);
-
-      this.$bus.$emit('refreshConnections');
-      // 100ms after connection list is ready
-      setTimeout(() => {
-        this.$bus.$emit('duplicateConnection', newConfig);
-      }, 100);
+      storage.addConnection(newConfig).then(() => {
+        this.$bus.$emit('refreshConnections');
+        // 100ms after connection list is ready
+        setTimeout(() => {
+          this.$bus.$emit('duplicateConnection', newConfig);
+        }, 100);
+      }).catch((e) => { this.$message.error(e.message); });
     },
     deleteConnection() {
       this.$confirm(
         this.$t('message.confirm_to_delete_connection'),
         { type: 'warning' },
       ).then(() => {
-        storage.deleteConnection(this.config);
-        this.$bus.$emit('refreshConnections');
-
-        this.$message.success({
-          message: this.$t('message.delete_success'),
-          duration: 1000,
-        });
+        storage.deleteConnection(this.config).then(() => {
+          storage.hookAfterDelConnection(this.config);
+          this.$bus.$emit('refreshConnections');
+          this.$message.success({
+            message: this.$t('message.delete_success'),
+            duration: 1000,
+          });
+        }).catch((e) => { this.$message.error(e.message); });
       }).catch(() => {});
     },
     openStatus() {
@@ -240,10 +240,16 @@ export default {
       this.$bus.$emit('slowLog', this.client, this.config.connectionName);
     },
     importKeys() {
-      remote.dialog.showOpenDialog(remote.getCurrentWindow(), {
-        properties: ['openFile'],
-      }).then((reply) => {
-        if (reply.canceled) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.txt,.csv,key*';
+      input.hidden = true;
+      document.body.appendChild(input);
+
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          document.body.removeChild(input);
           return;
         }
 
@@ -251,105 +257,44 @@ export default {
         const fail = [];
         let count = 0;
 
-        const rl = require('readline').createInterface({
-          input: require('fs').createReadStream(reply.filePaths[0]),
-        });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const lines = reader.result.split(/\r?\n/);
+          lines.forEach((line) => {
+            let [key, content, ttl] = line.split(',');
 
-        rl.on('line', (line) => {
-          let [key, content, ttl] = line.split(',');
+            if (!key || !content) {
+              return;
+            }
 
-          if (!key || !content) {
-            return;
-          }
+            count++;
 
-          count++;
+            // show notify in first time
+            if (count === 1) {
+              this.$notify.success({
+                message: this.$createElement('p', { ref: 'importKeysNotify' }, ''),
+                duration: 0,
+              });
+            }
 
-          // show notify in first time
-          if (count === 1) {
-            this.$notify.success({
-              message: this.$createElement('p', { ref: 'importKeysNotify' }, ''),
-              duration: 0,
+            key = Buffer.from(key, 'hex');
+            content = Buffer.from(content, 'hex');
+            ttl = ttl > 0 ? ttl : 0;
+
+            // fix #1213, REPLACE can be used in Redis>=3.0
+            this.client.callBuffer('RESTORE', key, ttl, content, 'REPLACE').then(() => {
+              succ.push(key);
+            }).catch(() => {
+              fail.push(key);
+            }).finally(() => {
+              try { // guard against refs removed
+                this.$set(this.$refs.importKeysNotify,
+                  'innerHTML',
+                  `Succ: ${succ.length}, Fail: ${fail.length}`);
+              } catch (_) { /* ignore */ }
             });
-          }
-
-          key = Buffer.from(key, 'hex');
-          content = Buffer.from(content, 'hex');
-          ttl = ttl > 0 ? ttl : 0;
-
-          // fix #1213, REPLACE can be used in Redis>=3.0
-          this.client.callBuffer('RESTORE', key, ttl, content, 'REPLACE').then((reply) => {
-            // reply == 'OK'
-            succ.push(key);
-          }).catch((e) => {
-            fail.push(key);
-          }).finally(() => {
-            this.$set(this.$refs.importKeysNotify,
-              'innerHTML',
-              `Succ: ${succ.length}, Fail: ${fail.length}`);
-          });
-        });
-
-        rl.on('close', () => {
-          if (count === 0) {
-            return this.$message.error('File parse failed.');
-          }
-
-          (count > 10000) && this.$message.success({
-            message: this.$t('message.import_success'),
-            duration: 800,
           });
 
-          // refresh keu list
-          this.$bus.$emit('refreshKeyList', this.client);
-        });
-      });
-    },
-    execFileCMDS() {
-      remote.dialog.showOpenDialog(remote.getCurrentWindow(), {
-        properties: ['openFile'],
-      }).then((reply) => {
-        if (reply.canceled) {
-          return;
-        }
-
-        const succ = [];
-        const fail = [];
-        let count = 0;
-
-        const rl = require('readline').createInterface({
-          input: require('fs').createReadStream(reply.filePaths[0]),
-        });
-
-        rl.on('line', (line) => {
-          const paramsArr = splitargs(line, true);
-
-          if (!paramsArr || !paramsArr.length) {
-            return;
-          }
-
-          count++;
-
-          // show notify in first time
-          if (count === 1) {
-            this.$notify.success({
-              message: this.$createElement('p', { ref: 'importCMDNotify' }, ''),
-              duration: 0,
-            });
-          }
-
-          this.client.callBuffer(...paramsArr).then((reply) => {
-            succ.push(line);
-          }).catch((e) => {
-            fail.push(line);
-          }).finally(() => {
-            this.$set(this.$refs.importCMDNotify,
-              'innerHTML',
-              `Succ: ${succ.length}, Fail: ${fail.length}`
-            );
-          });
-        });
-
-        rl.on('close', () => {
           if (count === 0) {
             return this.$message.error('File parse failed.');
           }
@@ -361,8 +306,82 @@ export default {
 
           // refresh key list
           this.$bus.$emit('refreshKeyList', this.client);
-        });
-      });
+        };
+
+        reader.readAsText(file);
+        document.body.removeChild(input);
+      };
+      input.click();
+    },
+    execFileCMDS() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.txt,.cmd,*';
+      input.hidden = true;
+      document.body.appendChild(input);
+
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          document.body.removeChild(input);
+          return;
+        }
+
+        const succ = [];
+        const fail = [];
+        let count = 0;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const lines = reader.result.split(/\r?\n/);
+          lines.forEach((line) => {
+            const paramsArr = splitargs(line, true);
+
+            if (!paramsArr || !paramsArr.length) {
+              return;
+            }
+
+            count++;
+
+            // show notify in first time
+            if (count === 1) {
+              this.$notify.success({
+                message: this.$createElement('p', { ref: 'importCMDNotify' }, ''),
+                duration: 0,
+              });
+            }
+
+            this.client.callBuffer(...paramsArr).then(() => {
+              succ.push(line);
+            }).catch(() => {
+              fail.push(line);
+            }).finally(() => {
+              try {
+                this.$set(this.$refs.importCMDNotify,
+                  'innerHTML',
+                  `Succ: ${succ.length}, Fail: ${fail.length}`
+                );
+              } catch (_) { /* ignore */ }
+            });
+          });
+
+          if (count === 0) {
+            return this.$message.error('File parse failed.');
+          }
+
+          (count > 10000) && this.$message.success({
+            message: this.$t('message.import_success'),
+            duration: 800,
+          });
+
+          // refresh key list
+          this.$bus.$emit('refreshKeyList', this.client);
+        };
+
+        reader.readAsText(file);
+        document.body.removeChild(input);
+      };
+      input.click();
     },
     flushDB() {
       if (!this.client) {
@@ -404,7 +423,7 @@ export default {
   }
 
   .connection-menu .connection-name {
-    margin-right: 115px;
+    margin-right: 130px;
     padding-right: 6px;
     word-break: keep-all;
     white-space: nowrap;
@@ -414,25 +433,26 @@ export default {
     font-size: 1.04em;
   }
   .connection-menu .connection-opt-icons {
-    /*width: 30px;*/
-    /*float: right;
-    margin-right: 28px;*/
     position: absolute;
     right: 25px;
-    top: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
   }
   .connection-menu .connection-right-icon {
-    display: inline-block;
-    font-size: 1.16em;
-    /*font-weight: bold;*/
-    padding: 3px;
-    margin-right: -4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.32em;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
     transition: background 0.2s;
+    cursor: pointer;
   }
   .connection-menu .connection-right-icon:hover {
-    /*color: #85878a;*/
     background: #dcdee0;
-    border-radius: 3px;
   }
   .dark-mode .connection-menu .connection-right-icon:hover {
     background: #58707b;
@@ -440,7 +460,8 @@ export default {
 
   /*fix more operation btn icon vertical-center*/
   .connection-menu-more {
-    vertical-align: baseline;
+    display: inline-flex;
+    align-items: center;
   }
   /*more operation ul>ico*/
   .connection-menu-more-ul .more-operate-ico {
@@ -450,5 +471,43 @@ export default {
 
   .font-weight-bold {
     font-weight: bold;
+  }
+
+  /* connection status dot */
+  .conn-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin: 0 6px 0 2px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  .conn-status-dot--offline {
+    background-color: #bbbec4;
+  }
+  .dark-mode .conn-status-dot--offline {
+    background-color: #4e5d65;
+  }
+
+  .conn-status-dot--live {
+    background-color: #67c23a;
+  }
+  .conn-status-dot--live::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: #67c23a;
+    animation: conn-dot-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes conn-dot-pulse {
+    0%   { transform: scale(1);   opacity: 0.8; }
+    70%  { transform: scale(2.2); opacity: 0; }
+    100% { transform: scale(2.2); opacity: 0; }
   }
 </style>

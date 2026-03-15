@@ -370,9 +370,8 @@ export default {
       // record raw tips count
       this.searchHistoryCount = this.searchHistory.size;
 
-      ipcRenderer.on('closingWindow', (event, arg) => {
-        this.storeHistory();
-      });
+      // Preserve history when page unloads
+      window.addEventListener('beforeunload', this.storeHistory);
     },
     storeHistory() {
       // not changed

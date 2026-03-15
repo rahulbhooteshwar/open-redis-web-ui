@@ -83,11 +83,11 @@
           </el-form-item>
 
           <el-form-item :label="$t('message.private_key')">
-            <FileInput
-              :file.sync='connection.sshOptions.privatekey'
-              :bookmark.sync='connection.sshOptions.privatekeybookmark'
-              placeholder='SSH Private Key'>
-            </FileInput>
+            <KeyInput
+              :content.sync='connection.sshOptions.privatekey'
+              :filename.sync='connection.sshOptions.privatekeybookmark'
+              placeholder='SSH Private Key — paste PEM or load from file'>
+            </KeyInput>
           </el-form-item>
 
           <el-form-item label="Passphrase">
@@ -122,30 +122,30 @@
         <!-- left col -->
         <el-col :span=12>
           <el-form-item :label="$t('message.private_key')">
-            <FileInput
-              :file.sync='connection.sslOptions.key'
-              :bookmark.sync='connection.sslOptions.keybookmark'
-              placeholder='SSL Private Key Pem (key)'>
-              </FileInput>
+            <KeyInput
+              :content.sync='connection.sslOptions.key'
+              :filename.sync='connection.sslOptions.keybookmark'
+              placeholder='SSL Private Key PEM (key) — paste or load from file'>
+            </KeyInput>
           </el-form-item>
 
           <el-form-item :label="$t('message.authority')">
-            <FileInput
-              :file.sync='connection.sslOptions.ca'
-              :bookmark.sync='connection.sslOptions.cabookmark'
-              placeholder='SSL Certificate Authority (CA)'>
-              </FileInput>
+            <KeyInput
+              :content.sync='connection.sslOptions.ca'
+              :filename.sync='connection.sslOptions.cabookmark'
+              placeholder='SSL Certificate Authority (CA) — paste or load from file'>
+            </KeyInput>
           </el-form-item>
         </el-col>
 
         <!-- right col -->
         <el-col :span=12>
           <el-form-item :label="$t('message.public_key')">
-            <FileInput
-              :file.sync='connection.sslOptions.cert'
-              :bookmark.sync='connection.sslOptions.certbookmark'
-              placeholder='SSL Public Key Pem (cert)'>
-              </FileInput>
+            <KeyInput
+              :content.sync='connection.sslOptions.cert'
+              :filename.sync='connection.sslOptions.certbookmark'
+              placeholder='SSL Public Key PEM (cert) — paste or load from file'>
+            </KeyInput>
           </el-form-item>
 
           <!-- SNI -->
@@ -188,7 +188,7 @@
 
 <script type="text/javascript">
 import storage from '@/storage';
-import FileInput from '@/components/FileInput';
+import KeyInput from '@/components/KeyInput';
 import InputPassword from '@/components/InputPassword';
 
 export default {
@@ -232,7 +232,7 @@ export default {
       sentinelOptionsShow: false,
     };
   },
-  components: { FileInput, InputPassword },
+  components: { KeyInput, InputPassword },
   props: {
     config: {
       default: _ => new Array(),
@@ -270,7 +270,7 @@ export default {
         this.connection = JSON.parse(JSON.stringify(this.connectionEmpty));
       }
     },
-    editConnection() {
+    async editConnection() {
       const config = JSON.parse(JSON.stringify(this.connection));
 
       if (this.sentinelOptionsShow && config.cluster) {
@@ -293,7 +293,7 @@ export default {
       }
 
       const oldKey = storage.getConnectionKey(this.config);
-      storage.editConnectionByKey(config, oldKey);
+      await storage.editConnectionByKey(config, oldKey);
 
       this.dialogVisible = false;
       this.$emit('editConnectionFinished', config);

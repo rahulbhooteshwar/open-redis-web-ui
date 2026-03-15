@@ -1,0 +1,11 @@
+services:
+  ardm:
+    build: .
+    ports:
+      - "9988:9988"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=9988
+      - DATA_DIR=/app/data
+    restart: unless-stopped

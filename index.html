@@ -3,64 +3,67 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name="theme-color" content="#263238">
+    <meta name="description" content="A web-based Redis manager — browse, edit and manage Redis from your browser.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Redis UI">
     <link rel="stylesheet" type="text/css" id="theme-link">
-    <title>Another Redis Desktop Manager</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <title>Open Redis Web UI</title>
   </head>
   <body>
-    <!-- this script must be placed here after body -->
+    <script>window.global = window;</script>
     <script type="text/javascript">
-      const ipcRenderer = require('electron').ipcRenderer;
-
-      function changeCSS(theme = 'light') {
-        const themeHref = `static/theme/${theme}/index.css`;
+      function changeCSS(theme) {
+        var themeHref = '/theme/' + theme + '/index.css';
         document.getElementById('theme-link').href = themeHref;
-        theme == 'dark' ? document.body.classList.add('dark-mode') :
-                          document.body.classList.remove('dark-mode');
+        theme === 'dark' ? document.body.classList.add('dark-mode')
+                        : document.body.classList.remove('dark-mode');
       }
 
+      // Used by Setting.vue via globalChangeTheme()
       function globalChangeTheme(theme) {
-        ipcRenderer.invoke('changeTheme', theme).then(shouldUseDarkColors => {
-          // delay to avoid stuck
-          setTimeout(() => {
-            changeCSS(shouldUseDarkColors ? 'dark' : 'light');
-          }, 100);
-        });
+        var resolved = theme;
+        if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        changeCSS(resolved);
+        localStorage.theme = theme;
       }
 
-      // triggered by OS theme changed
-      ipcRenderer.on('os-theme-updated', (event, arg) => {
-        // auto change only when theme set to 'system'
-        if (arg.themeSource != 'system') {
-          return;
-        }
-
-        setTimeout(() => {
-          changeCSS(arg.shouldUseDarkColors ? 'dark' : 'light');
-        }, 100);
-      });
-
-      // theme init at startup
-      (() => {
-        let theme = localStorage.theme;
-
-        if (!['system', 'light', 'dark'].includes(theme)) {
+      // Theme init at startup
+      (function () {
+        var theme = localStorage.theme;
+        if (['light', 'dark'].indexOf(theme) === -1) {
           theme = 'system';
         }
-
-        // follow system OS
-        if (theme == 'system') {
-          const dark = (new URL(window.location.href)).searchParams.get('dark');
-          changeCSS(dark === 'true' ? 'dark' : 'light');
-        }
-        // setted light or dark
-        else {
+        if (theme === 'system') {
+          var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          changeCSS(dark ? 'dark' : 'light');
+          // Keep in sync when OS theme changes
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            if (localStorage.theme === 'system') {
+              changeCSS(e.matches ? 'dark' : 'light');
+            }
+          });
+        } else {
           changeCSS(theme);
-          ipcRenderer.invoke('changeTheme', theme);
         }
       })();
     </script>
 
     <div id="app"></div>
-    <!-- built files will be auto injected -->
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>

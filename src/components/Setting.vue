@@ -156,8 +156,9 @@
 </template>
 
 <script type="text/javascript">
+import axios from 'axios';
 import storage from '@/storage.js';
-import { ipcRenderer } from 'electron';
+import { copyToClipboard } from '@/utils/ipcBridge';
 import LanguageSelector from '@/components/LanguageSelector';
 
 export default {
@@ -217,11 +218,10 @@ export default {
       globalChangeTheme(this.themeMode);
     },
     changeZoom() {
-      const { webFrame } = require('electron');
       let { zoomFactor } = this.form;
-
       zoomFactor = zoomFactor || 1.0;
-      webFrame.setZoomFactor(zoomFactor);
+      document.documentElement.style.setProperty('zoom', zoomFactor);
+      document.body.style.zoom = zoomFactor;
     },
     showImportDialog() {
       this.importConnectionVisible = true;
@@ -233,7 +233,7 @@ export default {
       };
       reader.readAsText(file.raw);
     },
-    importConnnection() {
+    async importConnnection() {
       this.importConnectionVisible = false;
       let config = this.$util.base64Decode(this.connectionFileContent);
 
@@ -242,19 +242,50 @@ export default {
       }
 
       config = JSON.parse(config);
-      // remove all connections first
-      storage.setConnections({});
-      // close all connections
-      this.$bus.$emit('closeConnection');
-      this.$bus.$emit('refreshConnections');
 
-      for (const line of config) {
-        storage.addConnection(line);
+      // Migration: legacy Electron connections stored file paths in key fields.
+      // Strip any absolute paths so the user re-enters the key content.
+      const isAbsolutePath = (v) => typeof v === 'string' && (v.startsWith('/') || /^[A-Za-z]:\\/.test(v));
+      const legacyNames = [];
+      for (const conn of config) {
+        if (conn.sshOptions && isAbsolutePath(conn.sshOptions.privatekey)) {
+          conn.sshOptions.privatekey = '';
+          conn.sshOptions.privatekeybookmark = '';
+          legacyNames.push(conn.name || conn.host);
+        }
+        if (conn.sslOptions) {
+          for (const field of ['key', 'cert', 'ca']) {
+            if (isAbsolutePath(conn.sslOptions[field])) {
+              conn.sslOptions[field] = '';
+              conn.sslOptions[`${field}bookmark`] = '';
+              if (!legacyNames.includes(conn.name || conn.host)) {
+                legacyNames.push(conn.name || conn.host);
+              }
+            }
+          }
+        }
+      }
+      if (legacyNames.length > 0) {
+        this.$message.warning({
+          message: `Legacy key file paths were cleared for: ${legacyNames.join(', ')}. Please re-enter the key content in each connection.`,
+          duration: 6000,
+        });
       }
 
-      this.$nextTick(() => {
-        this.$bus.$emit('refreshConnections');
-      });
+      // delete all existing connections first
+      const existing = await storage.getConnections(true);
+      await Promise.all(existing.map(c => storage.deleteConnection(c)));
+
+      // close all connections
+      this.$bus.$emit('closeConnection');
+
+      // add imported connections sequentially (strip key so server assigns a new one)
+      for (const line of config) {
+        const { key, ...conn } = line;
+        await storage.addConnection(conn);
+      }
+
+      this.$bus.$emit('refreshConnections');
 
       this.$message.success({
         message: this.$t('message.import_success'),
@@ -262,10 +293,11 @@ export default {
       });
     },
     exportConnection() {
-      let connections = storage.getConnections(true);
-      connections = this.$util.base64Encode(JSON.stringify(connections));
-      this.$util.createAndDownloadFile('connections.ano', connections);
-      this.visible = false;
+      storage.getConnections(true).then(cons => {
+        const b64 = this.$util.base64Encode(JSON.stringify(cons));
+        this.$util.createAndDownloadFile('connections.ano', b64);
+        this.visible = false;
+      });
     },
     checkUpdate() {
       this.$message.info({
@@ -276,17 +308,21 @@ export default {
       this.$bus.$emit('update-check', true);
     },
     bindGetAllFonts() {
-      ipcRenderer.on('send-all-fonts', (event, fonts) => {
-        fonts.unshift('Default Initial');
-
-        this.allFonts = [...new Set(fonts)];
-        this.loadingFonts = false;
-      });
+      // Font listing removed in web mode (requires native font-list package)
+      this.allFonts = ['System', 'Arial', 'Monospace'];
     },
-    getAllFonts() {
+    async getAllFonts() {
       if (this.allFonts.length === 0) {
         this.loadingFonts = true;
-        ipcRenderer.send('get-all-fonts');
+        try {
+          const { data } = await axios.get('/api/system/fonts');
+          fonts.unshift('Default Initial');
+          this.allFonts = [...new Set(fonts)];
+        } catch (e) {
+          // Fallback to basic fonts
+          this.allFonts = ['System', 'Arial', 'Monospace'];
+        }
+        this.loadingFonts = false;
       }
     },
     clearCache() {

@@ -31,7 +31,6 @@
 <script type="text/javascript">
 import { allCMD } from '@/commands';
 import splitargs from '@qii404/redis-splitargs';
-import { ipcRenderer } from 'electron';
 import CliContent from '@/components/CliContent';
 
 export default {
@@ -415,9 +414,8 @@ export default {
 
       this.inputSuggestionItems = tips ? JSON.parse(tips) : [];
 
-      ipcRenderer.on('closingWindow', (event, arg) => {
-        this.storeCommandTips();
-      });
+      // Persist CLI history when page unloads
+      window.addEventListener('beforeunload', this.storeCommandTips);
     },
     storeCommandTips() {
       const key = this.$storage.getStorageKeyByName('cli_tip', this.client.options.connectionName);

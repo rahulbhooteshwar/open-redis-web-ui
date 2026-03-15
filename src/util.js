@@ -1,3 +1,10 @@
+import { isSerialized as phpIsSerialized } from 'php-serialize';
+import { ObjectInputStream } from 'java-object-serialization';
+import { Parser as PickleParser } from 'pickleparser';
+import { decode as msgpackDecode } from 'algo-msgpack-with-bigint';
+import { getData as rawprotoGetData } from 'rawproto';
+import zlib from 'zlib';
+
 export default {
   data: {},
   get(name) {
@@ -87,18 +94,14 @@ export default {
     return false;
   },
   isPHPSerialize(str) {
-    const phpSerialize = require('php-serialize');
-
     try {
-      // phpSerialize.unserialize(str);
-      return phpSerialize.isSerialized(str.toString());
+      return phpIsSerialized(str.toString());
     } catch (e) {}
 
     return false;
   },
   isJavaSerialize(buf) {
     try {
-      const { ObjectInputStream } = require('java-object-serialization');
       const result = (new ObjectInputStream(buf)).readObject();
       return typeof result === 'object';
     } catch (e) {
@@ -107,18 +110,15 @@ export default {
   },
   isPickle(buf) {
     try {
-      const { Parser } = require('pickleparser');
-      const result = (new Parser()).parse(buf);
+      const result = (new PickleParser()).parse(buf);
       return !!result;
     } catch (e) {
       return false;
     }
   },
   isMsgpack(buf) {
-    const { decode } = require('algo-msgpack-with-bigint');
-
     try {
-      const result = decode(buf);
+      const result = msgpackDecode(buf);
       if (['object', 'string'].includes(typeof result)) {
         return true;
       }
@@ -144,10 +144,8 @@ export default {
       return false;
     }
 
-    const { getData } = require('rawproto');
-
     try {
-      const result = getData(buf);
+      const result = rawprotoGetData(buf);
 
       // fix #922 some str mismatch
       if (result[0]) {
@@ -162,7 +160,6 @@ export default {
     return false;
   },
   zippedToString(buf, type = 'unzip') {
-    const zlib = require('zlib');
     const funMap = {
       // unzip will automatically detect Gzip or Deflate header
       unzip: 'unzipSync',
@@ -182,10 +179,14 @@ export default {
     return false;
   },
   base64Encode(str) {
-    return Buffer.from(str, 'utf8').toString('base64');
+    return btoa(unescape(encodeURIComponent(str)));
   },
   base64Decode(str) {
-    return Buffer.from(str, 'base64').toString('utf8');
+    try {
+      return decodeURIComponent(escape(atob(str)));
+    } catch (e) {
+      return '';
+    }
   },
   humanFileSize(size = 0) {
     if (!size) {
@@ -343,8 +344,11 @@ export default {
     });
   },
   copyToClipboard(text) {
-    const { clipboard } = require('electron');
-    clipboard.writeText(text ? text.toString() : '');
+    const str = text ? text.toString() : '';
+    if (navigator && navigator.clipboard) {
+      navigator.clipboard.writeText(str);
+      return;
+    }
   },
   debounce(func, wait, immediate = false, context = null) {
     let timeout; let

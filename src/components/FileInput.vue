@@ -1,6 +1,6 @@
 <template>
   <el-input
-    :value='file'
+    :value='bookmark || file'
     clearable
     @clear='clearFile'
     @focus='focus'
@@ -12,7 +12,6 @@
 </template>
 
 <script type="text/javascript">
-import { remote } from 'electron';
 
 export default {
   props: {
@@ -30,19 +29,27 @@ export default {
       e.target.blur();
     },
     showFileSelector() {
-      remote.dialog.showOpenDialog(remote.getCurrentWindow(), {
-        securityScopedBookmarks: true,
-        properties: ['openFile', 'showHiddenFiles'],
-      }).then((reply) => {
-        if (reply.canceled) {
-          return;
-        }
+      // Create hidden file input and click via hack to serve Electron dialog's purpose
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '*';
+      input.hidden = true;
+      input.multiple = false;
+      document.body.appendChild(input);
 
-        reply.filePaths && this.$emit('update:file', reply.filePaths[0]);
-        reply.bookmarks && this.$emit('update:bookmark', reply.bookmarks[0]);
-      }).catch((e) => {
-        this.$message.error(`File Input Error: ${e.message}`);
-      });
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            this.$emit('update:file', ev.target.result);
+            this.$emit('update:bookmark', file.name);
+          };
+          reader.readAsText(file);
+        }
+        document.body.removeChild(input);
+      };
+      input.click();
     },
   },
 };

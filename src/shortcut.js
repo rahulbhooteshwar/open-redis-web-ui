@@ -1,5 +1,4 @@
 import keymaster from 'keymaster';
-import { ipcRenderer } from 'electron';
 
 // enable shortcut in input, textarea, select
 keymaster.filter = e => true;
@@ -7,23 +6,11 @@ keymaster.filter = e => true;
 // prevent ctrl+r
 keymaster('ctrl+r, ⌘+r', e => false);
 
-// minimize window
-keymaster('ctrl+h, ctrl+m, ⌘+m', (e) => {
-  ipcRenderer.send('minimizeWindow');
-  return false;
-});
+// minimize window — no-op in browser; window cannot be minimized by JS
+keymaster('ctrl+h, ctrl+m, ⌘+m', (e) => false);
 
-// hide window on mac
-// (process.platform === 'darwin') && keymaster('⌘+h', e => {
-//   ipcRenderer.send('hideWindow');
-//   return false;
-// });
-
-// toggle maximize
-keymaster('ctrl+enter, ⌘+enter', (e) => {
-  ipcRenderer.send('toggleMaximize');
-  return false;
-});
+// hide window on mac — no-op in browser
+keymaster('ctrl+enter, ⌘+enter', (e) => false);
 
 export default {
   bind: (...args) => keymaster(...args),

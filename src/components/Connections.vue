@@ -63,10 +63,15 @@ export default {
     },
   },
   methods: {
-    initConnections() {
-      const connections = storage.getConnections(true);
+    async initConnections() {
+      let connections;
+      try {
+        connections = await storage.getConnections(true);
+      } catch (e) {
+        connections = [];
+      }
+      if (!Array.isArray(connections)) connections = [];
       const slovedConnections = [];
-      // this.connections = [];
 
       for (const item of connections) {
         item.connectionName = storage.getConnectionName(item);
@@ -104,16 +109,15 @@ export default {
 
 <style type="text/css">
   .connections-wrap {
-    height: calc(100vh - 59px);
     overflow-y: auto;
     margin-top: 11px;
+    /* height comes from flex parent (Aside) */
   }
   .connections-wrap .filter-input {
     padding-right: 13px;
     margin-bottom: 4px;
   }
-  /* set drag area min height, target to the end will be correct */
   .connections-wrap .connections-list {
-    min-height: calc(100vh - 110px);
+    min-height: 100px;
   }
 </style>

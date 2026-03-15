@@ -12,10 +12,10 @@
 </template>
 
 <script type="text/javascript">
-// import * as monaco from 'monaco-editor';
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import * as monaco from 'monaco-editor';
 
-const JSONbig = require('@qii404/json-bigint')({ useNativeBigInt: false });
+import JSONbigFactory from '@qii404/json-bigint';
+const JSONbig = JSONbigFactory({ useNativeBigInt: false });
 
 export default {
   data() {
@@ -109,8 +109,8 @@ export default {
         fontSize: 14,
         fontFamily: this.$storage.getFontFamily(),
         showFoldingControls: 'always',
-        // auto layout, performance cost
-        automaticLayout: true,
+        // disabled: causes ResizeObserver loop notifications; handled manually below
+        automaticLayout: false,
         wordWrap: 'on',
         // long text indent when wrapped
         wrappingIndent: 'indent',
@@ -140,12 +140,22 @@ export default {
       },
     );
 
-    // window.addEventListener("resize", this.onResize);
-    // this.monacoEditor.getAction('editor.foldLevel3').run();
-    // this.monacoEditor.getAction('editor.action.formatDocument').run();
+    // Use RAF-wrapped ResizeObserver to avoid "loop completed with undelivered
+    // notifications" — the synchronous layout() call inside the observer
+    // callback would itself trigger another resize notification without the
+    // rAF break.
+    this._resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        this.monacoEditor && this.monacoEditor.layout();
+      });
+    });
+    this._resizeObserver.observe(this.$refs.editor);
   },
   destroyed() {
-    // window.removeEventListener("resize", this.onResize);
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
     this.monacoEditor.dispose();
     this.$bus.$off('fontInited', this.changeFont);
   },

@@ -130,6 +130,15 @@ export default {
     overflow-y: hidden;
   }
 
+  /* loading overlay shown instead of table while data is fetching */
+  .key-content-container .content-table-container .content-table-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #909399;
+  }
+
   /* vxe table cell */
   .key-content-container .content-table-container .vxe-cell {
     overflow: hidden !important;

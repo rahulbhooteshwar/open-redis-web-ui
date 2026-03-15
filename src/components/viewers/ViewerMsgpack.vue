@@ -6,7 +6,8 @@
 import JsonEditor from '@/components/JsonEditor';
 import { decode, encode } from 'algo-msgpack-with-bigint';
 
-const JSONbig = require('@qii404/json-bigint')({ useNativeBigInt: true });
+import JSONbigFactory from '@qii404/json-bigint';
+const JSONbig = JSONbigFactory({ useNativeBigInt: true });
 
 
 export default {

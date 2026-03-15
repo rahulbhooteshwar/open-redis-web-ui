@@ -6,7 +6,7 @@
       <el-button type="primary" @click="showEditDialog({})">{{ $t('message.add_new_line') }}</el-button>
 
       <!-- edit & add dialog -->
-      <el-dialog :title="dialogTitle" :visible.sync="editDialog" @open="openDialog" :close-on-click-modal="false">
+      <el-dialog :title="dialogTitle" :visible.sync="editDialog" @open="openDialog" :close-on-click-modal="false" :destroy-on-close="true">
         <el-form label-position="top">
 
           <!-- if ttl support -->
@@ -40,7 +40,11 @@
 
     <!-- vxe table must get a container with a fixed height -->
     <div class="content-table-container">
+      <div v-if="loadingIcon" class="content-table-loading">
+        <i class="el-icon-loading" style="font-size: 32px;"></i>
+      </div>
       <vxe-table
+        v-else
         ref="contentTable"
         size="mini" max-height="100%" min-height="72px"
         border="default" stripe show-overflow="title"
@@ -71,10 +75,18 @@
             </el-input>
           </template>
           <template slot-scope="scope">
-            <el-button type="text" @click="$util.copyToClipboard(scope.row.value)" icon="el-icon-document" :title="$t('message.copy')"></el-button>
-            <el-button type="text" @click="showEditDialog(scope.row)" icon="el-icon-edit" :title="$t('message.edit_line')"></el-button>
-            <el-button type="text" @click="deleteLine(scope.row)" icon="el-icon-delete" :title="$t('el.upload.delete')"></el-button>
-            <el-button type="text" @click="dumpCommand(scope.row)" icon="fa fa-code" :title="$t('message.dump_to_clipboard')"></el-button>
+            <el-tooltip :content="$t('message.copy')" placement="top" :enterable="false">
+              <el-button type="text" @click="$util.copyToClipboard(scope.row.value)" icon="el-icon-document"></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('message.edit_line')" placement="top" :enterable="false">
+              <el-button type="text" @click="showEditDialog(scope.row)" icon="el-icon-edit"></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('el.upload.delete')" placement="top" :enterable="false">
+              <el-button type="text" @click="deleteLine(scope.row)" icon="el-icon-delete"></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('message.dump_to_clipboard')" placement="top" :enterable="false">
+              <el-button type="text" @click="dumpCommand(scope.row)" icon="fa fa-code"></el-button>
+            </el-tooltip>
           </template>
         </vxe-column>
       </vxe-table>

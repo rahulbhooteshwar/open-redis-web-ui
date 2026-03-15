@@ -194,7 +194,5 @@ const writeCMD = {
   ZUNIONSTORE: 'ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]',
 };
 
-module.exports = {
-  allCMD: { ...adminCMD, ...readCMD, ...writeCMD },
-  writeCMD,
-};
+export const allCMD = { ...adminCMD, ...readCMD, ...writeCMD };
+export { writeCMD };

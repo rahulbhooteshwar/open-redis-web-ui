@@ -310,6 +310,7 @@ export default {
       this.selectedTabName = this.tabs[index].name;
     },
     openContextMenu(event) {
+      event.preventDefault();
       this.preTabId = '';
       this.hideAllMenus();
 

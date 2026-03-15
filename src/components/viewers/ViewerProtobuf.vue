@@ -23,8 +23,7 @@
 import JsonEditor from '@/components/JsonEditor';
 import { getData } from 'rawproto';
 // import * as protobuf from 'protobufjs';
-const protobuf = require('protobufjs/minimal');
-const { dialog } = require('electron').remote;
+import protobuf from 'protobufjs/minimal';
 
 export default {
   data() {
@@ -63,34 +62,47 @@ export default {
       }
     },
     selectProto() {
-      dialog.showOpenDialog({
-        properties: ['openFile', 'multiSelections'],
-        filters: [
-          {
-            name: '.proto',
-            extensions: ['proto'],
-          },
-        ],
-      }).then((result) => {
-        if (result.canceled) return;
-        this.proto = result.filePaths;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = '.proto';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+
+      input.onchange = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) {
+          document.body.removeChild(input);
+          return;
+        }
+        const urls = files.map(f => URL.createObjectURL(f));
+        this.proto = urls;
         this.types = ['Rawproto'];
         this.selectedType = 'Rawproto';
 
-        protobuf.load(this.proto).then((root) => {
+        Promise.all(files.map(f => {
+          const reader = new FileReader();
+          return new Promise((resolve, reject) => {
+            reader.onload = () => resolve({ name: f.name, content: reader.result });
+            reader.onerror = reject;
+            reader.readAsText(f);
+          });
+        })).then(contents => {
+          const root = new protobuf.Root();
+          for (const item of contents) {
+            protobuf.parse(item.content, root, { keepCase: true });
+          }
           this.protoRoot = root;
-          // init types
           this.traverseTypes(root);
-          // first type as default
           if (this.types.length > 0) {
             this.selectedType = this.types[1];
           }
         }).catch((e) => {
           this.$message.error(e.message);
         });
-      }).catch((e) => {
-        this.$message.error(e.message);
-      });
+        document.body.removeChild(input);
+      };
+      input.click();
     },
     getContent() {
       if (!this.protoRoot) {

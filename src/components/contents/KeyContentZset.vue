@@ -36,7 +36,11 @@
 
     <!-- vxe table must get a container with a fixed height -->
     <div class="content-table-container">
+      <div v-if="loadingIcon" class="content-table-loading">
+        <i class="el-icon-loading" style="font-size: 32px;"></i>
+      </div>
       <vxe-table
+        v-else
         ref="contentTable"
         size="mini" max-height="100%" min-height="72px"
         border="default" stripe show-overflow="title"

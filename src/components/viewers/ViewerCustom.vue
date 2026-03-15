@@ -11,10 +11,9 @@
 </template>
 
 <script type="text/javascript">
+import axios from 'axios';
 import storage from '@/storage';
-import shell from 'child_process';
 import JsonEditor from '@/components/JsonEditor';
-import { ipcRenderer } from 'electron';
 
 export default {
   data() {
@@ -99,26 +98,16 @@ export default {
       // if content is too long, write to file simultaneously
       // hex str is about 2 times of real size
       if (hexStr.length > this.writeHexFileSize) {
-        ipcRenderer.invoke('getTempPath').then((reply) => {
-          // target file name
-          const fileName = `ardm_cv_${this.redisKey.toString('hex')}`;
-          const filePath = require('path').join(reply, fileName);
+        // Replace {HEX} placeholder with file path note
+        this.fullCommand = this.fullCommand
+          .replace('{HEX}', '<Content Too Long, Use {HEX_FILE} Instead!>')
+          .replace('{HEX_FILE}', 'tmp_hex_file.txt');
+        this.previewCommand = this.previewCommand
+          .replace('{HEX}', '<Content Too Long, Use {HEX_FILE} Instead!>')
+          .replace('{HEX_FILE}', 'tmp_hex_file.txt');
 
-          require('fs').writeFile(filePath, hexStr, (err) => {
-            if (err) {
-              return this.$message.error(err);
-            }
-
-            this.fullCommand = this.fullCommand
-              .replace('{HEX_FILE}', filePath)
-              .replace('{HEX}', '<Content Too Long, Use {HEX_FILE} Instead!>');
-            this.previewCommand = this.previewCommand
-              .replace('{HEX_FILE}', filePath)
-              .replace('{HEX}', '<Content Too Long, Use {HEX_FILE} Instead!>');
-
-            this.exec();
-          });
-        });
+        // Send to server formatter endpoint
+        this.exec(hexStr, true);
       }
       // common content just exec
       else {
@@ -136,18 +125,11 @@ export default {
         this.exec();
       }
     },
-    exec() {
-      try {
-        shell.exec(this.fullCommand, (error, stdout, stderr) => {
-          if (error || stderr) {
-            this.execResult = error ? error.message : stderr;
-          } else {
-            this.execResult = stdout.trim();
-          }
-        });
-      } catch (e) {
-        return this.execResult = e.message;
-      }
+    exec(content = this.content.toString(), viaServer = false) {
+      const payload = { command: this.fullCommand, content };
+      axios.post('/api/formatter/exec', payload)
+        .then(res => (this.execResult = res.data.output))
+        .catch(err => (this.execResult = (err.response && err.response.data && err.response.data.message) || err.message));
     },
   },
   mounted() {

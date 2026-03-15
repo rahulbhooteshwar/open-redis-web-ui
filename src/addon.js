@@ -1,7 +1,7 @@
 import getopts from 'getopts';
-import { ipcRenderer } from 'electron';
 import bus from './bus';
 import storage from './storage';
+import { ipcInvoke } from '@/utils/ipcBridge';
 
 export default {
   setup() {
@@ -25,28 +25,27 @@ export default {
   initZoom() {
     let zoomFactor = storage.getSetting('zoomFactor');
     zoomFactor = zoomFactor || 1.0;
-
-    const { webFrame } = require('electron');
-    webFrame.setZoomFactor(zoomFactor);
+    document.documentElement.style.setProperty('zoom', zoomFactor);
+    document.body.style.zoom = zoomFactor;
   },
   openHrefInBrowser() {
-    const { shell } = require('electron');
-
     document.addEventListener('click', (event) => {
       const ele = event.target;
 
       if (ele && (ele.nodeName.toLowerCase() === 'a') && ele.href.startsWith('http')) {
         event.preventDefault();
-        shell.openExternal(ele.href);
+        window.open(ele.href, '_blank', 'noopener');
       }
     });
   },
   bindCliArgs() {
-    ipcRenderer.invoke('getMainArgs').then((result) => {
-      if (!result.argv) {
+    // Wrap in self-invoked async for webpack4
+    (async()=>{
+      const argv = await ipcInvoke('getMainArgs');
+      if (!argv || !argv.length) {
         return;
       }
-      const mainArgs = getopts(result.argv);
+      const mainArgs = getopts(argv);
 
       if (!mainArgs.host) {
         return;
@@ -116,6 +115,6 @@ export default {
           storage.deleteConnection(connection);
         }
       }, 300);
-    });
-  },
+    })();
+  }
 };

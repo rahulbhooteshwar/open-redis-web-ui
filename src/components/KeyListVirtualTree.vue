@@ -1,7 +1,12 @@
 <template>
   <div ref="treeWrapper" class='key-list-vtree'>
-    <!-- multi operate -->
-    <div class="batch-operate">
+    <!-- loading state -->
+    <div v-if="loading" class="vtree-loading">
+      <i class="el-icon-loading" style="font-size: 48px;"></i>
+    </div>
+
+    <!-- multi operate (hidden via CSS unless multiOperating) -->
+    <div v-if="!loading" class="batch-operate">
       <div class="fixed-col">
         <el-checkbox v-model='checkAllSelect' @change='toggleCheckAll' class='select-cancel-all' :title='$t("message.toggle_check_all")'></el-checkbox>
       </div>
@@ -20,8 +25,8 @@
       </div>
     </div>
 
-    <!-- tree list -->
-    <VueEasyTree
+    <!-- tree list (hidden while loading to suppress VueEasyTree's own empty/Chinese text) -->
+    <VueEasyTree v-if="!loading"
       ref="veTree"
       node-key="key"
       :show-checkbox='multiOperating'
@@ -33,7 +38,6 @@
       iconClass="fa fa-chevron-right"
       :expand-on-click-node='!multiOperating'
       :check-on-click-node='multiOperating'
-      :emptyText="$t('el.tree.emptyText')"
       @node-click="nodeClick"
       @node-contextmenu="rightClick"
       :default-expanded-keys="Array.from(expandedKeys)"
@@ -74,8 +78,9 @@
   </div>
 </template>
 
-<script type="text/javascript">
+<script>
 import VueEasyTree from '@qii404/vue-easy-tree';
+import { copyToClipboard } from '@/utils/ipcBridge';
 
 export default {
   data() {
@@ -97,7 +102,7 @@ export default {
       rightClickItem: '',
     };
   },
-  props: ['client', 'config', 'keyList'],
+  props: ['client', 'config', 'keyList', 'loading'],
   components: { VueEasyTree },
   computed: {
     separator() {
@@ -210,8 +215,7 @@ export default {
       switch (type) {
         // copy key name
         case 'copy': {
-          const { clipboard } = require('electron');
-          clipboard.writeText(this.rightClickNode.data.name);
+          copyToClipboard(this.rightClickNode.data.name);
           break;
         }
         // del single key["delete" in the key right menu]
@@ -404,8 +408,10 @@ export default {
         });
       }
 
-      // backup checked keys
-      this.checkedKeys = this.$refs.veTree.getCheckedKeys(true);
+      // backup checked keys (veTree may be unmounted while loading)
+      if (this.$refs.veTree) {
+        this.checkedKeys = this.$refs.veTree.getCheckedKeys(true);
+      }
 
       const keyNodes = this.separator
         ? this.$util.keysToTree(newListCopy, this.separator, this.expandedKeys, this.treeNodesOverflow)
@@ -414,6 +420,7 @@ export default {
       this.keyNodes = keyNodes;
 
       this.$nextTick(() => {
+        if (!this.$refs.veTree) return;
         // sort outermost layer nodes
         this.$util.sortByTreeNodes(this.$refs.veTree.root.childNodes);
         // recheck checked nodes
@@ -433,6 +440,14 @@ export default {
 </script>
 
 <style>
+.vtree-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+}
+
 .key-list-vtree {
   height: calc(100vh - 250px);
 }

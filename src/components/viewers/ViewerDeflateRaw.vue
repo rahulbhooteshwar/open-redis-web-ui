@@ -4,9 +4,9 @@
 
 <script type="text/javascript">
 import JsonEditor from '@/components/JsonEditor';
-const JSONbig = require('@qii404/json-bigint')({ useNativeBigInt: false });
-
-const zlib = require('zlib');
+import JSONbigFactory from '@qii404/json-bigint';
+import zlib from 'zlib';
+const JSONbig = JSONbigFactory({ useNativeBigInt: false });
 
 export default {
   components: { JsonEditor },
