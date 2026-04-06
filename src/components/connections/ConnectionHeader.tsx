@@ -199,7 +199,7 @@ export function ConnectionHeader({
               <MoreHorizontal className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem onClick={onEdit}>
               <Edit className="mr-2 h-3.5 w-3.5" />
               Edit connection

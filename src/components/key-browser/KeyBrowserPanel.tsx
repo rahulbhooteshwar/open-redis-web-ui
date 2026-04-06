@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -29,16 +29,24 @@ interface DbInfo {
   keyCount: number
 }
 
+function toMatchPattern(input: string): string {
+  if (!input) return '*'
+  if (/[*?[]/.test(input)) return input
+  return `*${input}*`
+}
+
 export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refreshTrigger }: KeyBrowserPanelProps) {
   const [tree, setTree] = useState<TreeNode[]>([])
   const [loading, setLoading] = useState(false)
   const [keyCount, setKeyCount] = useState(0)
   const [dbs, setDbs] = useState<DbInfo[]>([])
   const [selectedDb, setSelectedDb] = useState(db)
+  const [searchPattern, setSearchPattern] = useState('')
   const keySeparator = useSettingsStore((s) => s.keySeparator)
   const activeEntry = useActiveConnectionsStore((s) => s.getConnection(configKey))
   const connColor = useConnectionsStore((s) => s.connections.find((c) => c.key === configKey)?.color)
   const abortRef = useRef<AbortController | null>(null)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadDbs = useCallback(async () => {
     try {
@@ -61,7 +69,7 @@ export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refres
     } catch { /* ignore */ }
   }, [connectionKey])
 
-  const scanKeys = useCallback(async (targetDb: number) => {
+  const scanKeys = useCallback(async (targetDb: number, pattern = '*') => {
     if (!connectionKey) return
 
     if (abortRef.current) abortRef.current.abort()
@@ -86,7 +94,7 @@ export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refres
       }
 
       do {
-        const url = `/api/keys/${connectionKey}/scan?cursor=${cursor}&match=*&count=500`
+        const url = `/api/keys/${connectionKey}/scan?cursor=${cursor}&match=${encodeURIComponent(pattern)}&count=500`
         const res = await fetch(url, { signal: controller.signal })
         if (!res.ok) break
         const data = await res.json()
@@ -108,20 +116,32 @@ export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refres
 
   useEffect(() => {
     loadDbs()
-    scanKeys(selectedDb)
+    scanKeys(selectedDb, toMatchPattern(searchPattern))
     return () => { if (abortRef.current) abortRef.current.abort() }
   }, [connectionKey, db, refreshTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      scanKeys(selectedDb, toMatchPattern(searchPattern))
+    }, 400)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [searchPattern]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDbChange = useCallback((newDb: number) => {
     setSelectedDb(newDb)
     if (activeEntry) useActiveConnectionsStore.getState().updateDb(configKey, newDb)
-    scanKeys(newDb)
-  }, [activeEntry, configKey, scanKeys])
+    scanKeys(newDb, toMatchPattern(searchPattern))
+  }, [activeEntry, configKey, scanKeys, searchPattern])
 
   const handleRefresh = useCallback(() => {
-    scanKeys(selectedDb)
+    scanKeys(selectedDb, toMatchPattern(searchPattern))
     loadDbs()
-  }, [loadDbs, scanKeys, selectedDb])
+  }, [loadDbs, scanKeys, selectedDb, searchPattern])
+
+  const keyCountLabel = keyCount > 0
+    ? `${keyCount.toLocaleString()} ${searchPattern ? 'matches' : 'keys'}`
+    : loading ? 'Loading…' : ''
 
   return (
     <div className="flex flex-col h-full">
@@ -145,7 +165,7 @@ export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refres
           </Select>
         ) : (
           <span className="text-[11px] text-muted-foreground flex-1">
-            {keyCount > 0 ? `${keyCount.toLocaleString()} keys` : loading ? 'Loading…' : ''}
+            {keyCountLabel}
           </span>
         )}
         {dbs.length > 1 && keyCount > 0 && (
@@ -163,6 +183,26 @@ export function KeyBrowserPanel({ configKey, connectionKey, db, onNewKey, refres
         >
           <RefreshCw className="h-3 w-3" />
         </Button>
+      </div>
+
+      {/* Search input */}
+      <div className="relative pb-1">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={searchPattern}
+          onChange={(e) => setSearchPattern(e.target.value)}
+          placeholder="Search keys…"
+          className="w-full h-6 pl-6 pr-6 text-[12px] bg-transparent border border-input rounded-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+        />
+        {searchPattern && (
+          <button
+            onClick={() => setSearchPattern('')}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {/* Key tree */}

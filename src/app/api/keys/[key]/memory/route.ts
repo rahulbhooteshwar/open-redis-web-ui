@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ key:
     }
     const client = redisPool.getClient(key) as Redis
     const usage = await (client as any).memory('usage', keyName)
-    return NextResponse.json({ usage })
+    return NextResponse.json({ usage: usage != null ? Number(usage) : null })
   } catch (e: any) {
     return NextResponse.json({ error: true, message: e.message }, { status: 500 })
   }

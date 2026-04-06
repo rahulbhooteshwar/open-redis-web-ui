@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { KeyboardSensor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Search } from 'lucide-react'
+import { GripVertical, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useConnectionsStore } from '@/store/connections'
 import { type StoredConnection } from '@/types/connection'
@@ -42,7 +42,7 @@ function SortableConnectionItem({
   onExpand?: () => void
   index: number
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: connection.key,
   })
 
@@ -57,14 +57,27 @@ function SortableConnectionItem({
       {collapsed ? (
         <div
           className="flex items-center justify-center py-1 px-1 cursor-grab active:cursor-grabbing"
+          ref={setActivatorNodeRef}
           {...listeners}
           onClick={onExpand}
         >
           <ConnectionIcon connection={connection} />
         </div>
       ) : (
-        <div {...listeners} className="cursor-grab active:cursor-grabbing">
-          <ConnectionItem connection={connection} index={index} />
+        <div className="flex items-stretch">
+          {/* Dedicated drag handle — listeners are scoped here so keyboard events
+              from interactive children (Select, buttons) don't trigger dnd-kit */}
+          <div
+            ref={setActivatorNodeRef}
+            {...listeners}
+            className="flex-shrink-0 flex items-center px-1 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground/90 transition-colors"
+            title="Drag to reorder"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <ConnectionItem connection={connection} index={index} />
+          </div>
         </div>
       )}
     </div>

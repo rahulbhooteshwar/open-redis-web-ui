@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Zap, Power, Loader2, AlertCircle } from 'lucide-react'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ChevronRight, Loader2, AlertCircle } from 'lucide-react'
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import { useTabsStore } from '@/store/tabs'
 import { connectViaServer, type RedisClientProxy } from '@/lib/redis-client-proxy'
 import { type StoredConnection, getConnectionDisplayName } from '@/types/connection'
 import { KeyBrowserPanel } from '@/components/key-browser/KeyBrowserPanel'
+import { useKeyBrowserRefreshStore } from '@/store/key-browser-refresh'
 import { NewKeyDialog } from '@/components/key-browser/NewKeyDialog'
 import { ConnectionHeader } from './ConnectionHeader'
 import { NewConnectionDialog } from './NewConnectionDialog'
@@ -162,6 +163,17 @@ export function ConnectionItem({ connection, index = 0 }: ConnectionItemProps) {
     [connection.key],
   )
 
+  useEffect(() => {
+    return useKeyBrowserRefreshStore.subscribe((state, prevState) => {
+      const key = connectionKey ?? ''
+      const curr = state.refreshCounts[key] ?? 0
+      const prev = prevState.refreshCounts[key] ?? 0
+      if (curr > prev) {
+        setFlushTrigger((n) => n + 1)
+      }
+    })
+  }, [connectionKey])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -173,36 +185,23 @@ export function ConnectionItem({ connection, index = 0 }: ConnectionItemProps) {
     <>
       <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
         <div className="group">
-          <div className={cn(
-            'flex items-center rounded-sm mx-2 transition-colors group',
-            index % 2 === 0 ? 'bg-sidebar-accent/30' : 'bg-muted/25',
-          )}>
-            <CollapsibleTrigger asChild>
-              <button
-                className="flex-shrink-0 p-2.5 rounded-sm hover:bg-sidebar-accent/60 transition-colors"
-                aria-label={isOpen ? 'Collapse connection' : 'Expand connection'}
-              >
-
-                {
-                  isOpen && <Zap
-                    strokeWidth={3}
-                    className={cn(
-                      'h-5 w-5 text-sidebar-foreground transition-transform duration-200 text-green-400',
-                    )}
-                  />
-                }
-                {
-                  !isOpen && <Power
-                    strokeWidth={3}
-                    className={cn(
-                      'h-5 w-5 text-sidebar-foreground transition-transform duration-200'
-                    )}
-                  />
-                }
-
-
-              </button>
-            </CollapsibleTrigger>
+          <div
+            className={cn(
+              'flex items-center rounded-sm mx-2 transition-colors group cursor-pointer',
+              index % 2 === 0 ? 'bg-sidebar-accent/30' : 'bg-muted/25',
+              'hover:bg-sidebar-accent/50',
+            )}
+            onClick={() => handleOpenChange(!isOpen)}
+          >
+            <div className="flex-shrink-0 p-2.5">
+              <ChevronRight
+                strokeWidth={3}
+                className={cn(
+                  'h-5 w-5 text-sidebar-foreground transition-transform duration-200',
+                  isOpen && 'rotate-90',
+                )}
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <ConnectionHeader
                 connection={connection}

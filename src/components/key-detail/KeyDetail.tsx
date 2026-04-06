@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useTabsStore } from '@/store/tabs'
+import { useKeyBrowserRefreshStore } from '@/store/key-browser-refresh'
 import { KeyHeader } from './KeyHeader'
 import { KeyContentString } from './contents/KeyContentString'
 import { KeyContentHash } from './contents/KeyContentHash'
@@ -27,12 +28,14 @@ function decodeRedisKey(b64: string): string {
 
 export function KeyDetail({ tab }: Props) {
   const { closeTab } = useTabsStore()
+  const { bumpRefresh } = useKeyBrowserRefreshStore()
   const [keyName, setKeyName] = useState(() => decodeRedisKey(tab.redisKey))
   const [refreshKey, setRefreshKey] = useState(0)
 
   const handleDeleted = useCallback(() => {
     closeTab(tab.id)
-  }, [closeTab, tab.id])
+    bumpRefresh(tab.connectionKey)
+  }, [closeTab, tab.id, tab.connectionKey, bumpRefresh])
 
   const handleRenamed = useCallback((newName: string) => {
     setKeyName(newName)

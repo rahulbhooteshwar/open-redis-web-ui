@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+COPY LICENSE ./
 COPY .npmrc package.json package-lock.json* ./
 RUN npm ci --userconfig .npmrc
 
@@ -22,6 +23,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Data directory for persistent connection configs
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
 
 VOLUME ["/app/data"]
 

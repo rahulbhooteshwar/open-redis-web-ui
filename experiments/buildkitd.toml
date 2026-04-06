@@ -1,0 +1,3 @@
+[registry."your-private-registry"]
+  http = true
+  insecure = true

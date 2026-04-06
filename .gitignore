@@ -30,3 +30,4 @@ tsconfig.tsbuildinfo
 .claude/skills
 .agents/
 skills-lock.json
+CLAUDE.md

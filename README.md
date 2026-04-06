@@ -1,4 +1,4 @@
-<img align="middle" width="110" src="src/assets/open-redis-web-ui.png">
+<img align="middle" width="110" src="public/open-redis-web-ui.png">
 
 # Open Redis Web UI
 
@@ -28,20 +28,18 @@ No git clone or Node.js required — just Docker.
 docker run -d \
   --name open-redis-web-ui \
   --restart unless-stopped \
-  -p 9988:9988 \
-  -v orwui-data:/app/data \
+  -p 2604:2604 \
+  -v open-redis-web-ui-data:/app/data \
   --add-host=host.docker.internal:host-gateway \
   bhooteshwarrahul/open-redis-web-ui:latest
 ```
 
-Then open [http://localhost:9988](http://localhost:9988) in your browser.
-
-> The production image builds the Vite frontend at image-build time and serves the compiled assets via Express on port 9988. There is no separate dev server at runtime.
+Then open [http://localhost:2604](http://localhost:2604) in your browser.
 
 | Option                                         | Description                                                                                                                                                                                                           |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-p 9988:9988`                                 | Expose the UI on port 9988. Change the left side to use a different host port, e.g. `-p 8080:9988`                                                                                                                    |
-| `-v orwui-data:/app/data`                      | Persist saved connections across container restarts                                                                                                                                                                   |
+| `-p 2604:2604`                                 | Expose the UI on port 2604. Change the left side to use a different host port, e.g. `-p 8080:2604`                                                                                                                    |
+| `-v open-redis-web-ui-data:/app/data`          | Persist saved connections across container restarts                                                                                                                                                                   |
 | `--restart unless-stopped`                     | Auto-start the container on Docker/host boot                                                                                                                                                                          |
 | `--add-host=host.docker.internal:host-gateway` | Allows connecting to Redis on your host machine using `localhost` or `127.0.0.1` as the host. Required on Linux; Docker Desktop for Mac/Windows includes this automatically but it doesn't hurt to set it explicitly. |
 
@@ -64,10 +62,11 @@ docker rm open-redis-web-ui
 ### Install & run
 
 ```bash
-TODO - add install & run instructions for development
+npm install
+npm run dev
 ```
 
-Open [http://localhost:19988](http://localhost:19988). The Vite dev server proxies `/api` and `/ws` to the Express server on port 9988.
+Open [http://localhost:2604](http://localhost:2604).
 
 ### Multi-platform Docker build & push
 
@@ -96,6 +95,7 @@ Tag a versioned release alongside `latest`:
 VERSION=1.2.0
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  --provenance=false \
   --tag bhooteshwarrahul/open-redis-web-ui:${VERSION} \
   --tag bhooteshwarrahul/open-redis-web-ui:latest \
   --push \
@@ -108,6 +108,26 @@ docker buildx build \
 
 ## Architecture
 
-```
-TODO - add
+```mermaid
+graph TB
+    subgraph Browser
+        A[Next.js App<br/>React 19 + Tailwind + shadcn/ui]
+        B[Key Browser<br/>Virtual Scrolling]
+        C[Value Editors<br/>All Redis Types]
+        D[CLI Console<br/>Pub/Sub Monitor]
+    end
+
+    subgraph Server["Node.js Server (server.ts)"]
+        E[Next.js<br/>SSR + API Routes]
+        F[WebSocket Handler<br/>/ws]
+        G[Redis Connection Pool<br/>ioredis]
+    end
+
+    subgraph Redis
+        H[Standalone / Cluster / Sentinel]
+        I[Optional: SSH Tunnel]
+    end
+
+    Browser -->|HTTP + WebSocket| Server
+    Server -->|Redis Protocol| Redis
 ```
