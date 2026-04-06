@@ -1,0 +1,49 @@
+# Dependencies — reinstalled via npm ci in builder stage
+node_modules/
+
+# Build outputs — generated during docker build
+.next/
+dist/
+build/
+tsconfig.tsbuildinfo
+
+# Runtime data — mounted as a volume at /app/data
+data/
+
+# Git
+.git/
+.github/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS artifacts
+.DS_Store
+
+# Temp / scratch
+.temp/
+
+# Editor & IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Claude Code / AI tooling
+.agents/
+.claude/
+skills-lock.json
+
+# Docker files (not needed inside the image)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Docs
+README.md
+TODOs.md

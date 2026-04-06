@@ -1,0 +1,9 @@
+name: DEV_OPEN_REDIS_WEB_UI
+services:
+  open-redis-web-ui:
+    build: .
+    ports:
+      - "9291:2604"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
